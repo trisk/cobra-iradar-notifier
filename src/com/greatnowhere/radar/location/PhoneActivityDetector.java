@@ -13,22 +13,22 @@ import android.util.Log;
 
 import com.cobra.iradar.protocol.CobraRadarMessageNotification;
 import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesClient;
-import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.android.gms.location.ActivityRecognitionClient;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.location.ActivityRecognition;
 import com.google.android.gms.location.ActivityRecognitionResult;
 import com.google.android.gms.location.DetectedActivity;
 import com.greatnowhere.radar.messaging.RadarMessageNotification;
 
 import de.greenrobot.event.EventBus;
 
-public class PhoneActivityDetector implements GooglePlayServicesClient.ConnectionCallbacks,
-		GooglePlayServicesClient.OnConnectionFailedListener {
+public class PhoneActivityDetector implements GoogleApiClient.ConnectionCallbacks,
+		GoogleApiClient.OnConnectionFailedListener {
 
 	private static final String TAG = PhoneActivityDetector.class.getCanonicalName();
 	
 	private static PhoneActivityDetector instance;
-	private static ActivityRecognitionClient activityClient;
+	private static GoogleApiClient googleApiClient;
 	private static ActivityStatus activity = ActivityStatus.UNKNOWN;
 	private static Context ctx;
 	private static final long ACTIVITY_UPDATE_INTERVAL = 60000L; // every 60 secs
@@ -44,12 +44,19 @@ public class PhoneActivityDetector implements GooglePlayServicesClient.Connectio
 		uiManager = (UiModeManager) ctx.getSystemService(Context.UI_MODE_SERVICE);
 		isCarMode.set( uiManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_CAR );
 
-		int gpsResultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(ctx);
+		int gpsResultCode = ConnectionResult.SERVICE_MISSING;
+		GoogleApiAvailability avail = GoogleApiAvailability.getInstance();
+		if ( avail != null )
+			gpsResultCode = avail.isGooglePlayServicesAvailable(ctx);
 		if ( gpsResultCode == ConnectionResult.SUCCESS ) {
-			activityClient = new ActivityRecognitionClient(ctx, instance, instance);
-			activityClient.connect();
+			googleApiClient = new GoogleApiClient.Builder(ctx)
+			    .addApi(ActivityRecognition.API)
+			    .addConnectionCallbacks(instance)
+			    .addOnConnectionFailedListener(instance)
+			    .build();
+			googleApiClient.connect();
 		} else {
-			activityClient = null;
+			googleApiClient = null;
 			setActivityStatus(ActivityStatus.UNAVAILABLE);
 			eventBus.post(new RadarMessageNotification("Activity detection not available!\nError code " + gpsResultCode));
 		}
@@ -58,8 +65,8 @@ public class PhoneActivityDetector implements GooglePlayServicesClient.Connectio
 	
 	public static void stop() {
 		Log.d(TAG,"stop");
-		if ( activityClient.isConnected() )
-			activityClient.disconnect();
+		if ( googleApiClient.isConnected() )
+			googleApiClient.disconnect();
 	}
 
 	public static ActivityStatus getActivityStatus() {
@@ -93,9 +100,15 @@ public class PhoneActivityDetector implements GooglePlayServicesClient.Connectio
 		Intent i = new Intent(ctx, ActivityDetectorIntentReceiver.class);
 		PendingIntent callbackIntent = PendingIntent.getService(ctx, 0, i,
 	             PendingIntent.FLAG_UPDATE_CURRENT);
-		activityClient.requestActivityUpdates(ACTIVITY_UPDATE_INTERVAL, callbackIntent);
+		ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates(
+		    googleApiClient, ACTIVITY_UPDATE_INTERVAL, callbackIntent);
+
 	}
 
+	public void onConnectionSuspended(int cause) {
+		Log.i(TAG,"connection suspended");
+		setActivityStatus(ActivityStatus.UNKNOWN);
+	}
 
 	public void onDisconnected() {
 		Log.i(TAG,"disconnected");
