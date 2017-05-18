@@ -52,9 +52,6 @@
         <service android:label="Threat Logger Service" android:name="com.greatnowhere.radar.threats.ThreatLogger$ThreatLoggerService" android:enabled="true" android:singleUser="true"></service>
         <service android:label="DB Pruner Service" android:name="com.greatnowhere.radar.threats.ThreatLogger$DBPruneService" android:enabled="true"></service>
         <service android:name=".location.PhoneActivityDetector$ActivityDetectorIntentReceiver" android:enabled="true"></service>
-        <service android:name="com.octo.android.robospice.XmlSpringAndroidSpiceService" android:enabled="true"></service>
-        <service android:name="com.greatnowhere.wikispeedia.client.Services$MarkerAreaEnterService" android:enabled="true"/>
-        <service android:name="com.greatnowhere.wikispeedia.client.Services$PrimaryAreaExitService"></service>
         <receiver android:name="com.greatnowhere.radar.receiver.BootReceiver" android:enabled="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
